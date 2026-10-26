@@ -88,8 +88,9 @@
   .modal-close{width:100%; padding:14px; background:#2a3550; color:#fff; border:none; border-radius:12px; cursor:pointer;}
   .toast{position:fixed; left:50%; bottom:30px; transform:translate(-50%,20px); background:#1d3157ee;
     border:1px solid var(--gold); color:var(--gold); padding:12px 22px; border-radius:14px;
-    opacity:0; transition:.35s; pointer-events:none; z-index:99;}
+    opacity:0; transition:.35s; pointer-events:none; z-index:99; max-width:90vw; text-align:center;}
   .toast.show{opacity:1; transform:translate(-50%,0);}
+  .toast.error{border-color:#ff5555; color:#ff8888;}
   #teacherPanel{position:fixed; inset:0; z-index:60; display:none; background:radial-gradient(900px 600px at 50% 0%, #1d3157, #070c16); flex-direction:column;}
   #teacherPanel.show{display:flex;}
   .tp-header{padding:16px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #2b4370;}
@@ -98,6 +99,7 @@
   .btn-tp{background:#2a3550; border:1px solid #3f5a8a; color:#cfe0ff; padding:10px 16px;
     border-radius:12px; cursor:pointer; font-size:14px;}
   .btn-tp.primary{background:linear-gradient(180deg,#6fc0ff,#2f7fd6); border:none; color:#fff;}
+  .btn-tp.refresh{background:#3a1f28; border-color:#a33; color:#ffb3b3;}
   .tp-body{flex:1; overflow:auto; padding:20px;}
   .summary{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px;}
   .sum-card{flex:1; min-width:130px; background:linear-gradient(160deg,#1d3157,#101b30);
@@ -183,6 +185,7 @@
   <div class="tp-header">
     <h2>👩‍🏫 Результаты урока</h2>
     <div class="tp-actions">
+      <button class="btn-tp refresh" id="refreshBtn">Обновить</button>
       <button class="btn-tp primary" id="teacherShareBtn">QR-код</button>
       <button class="btn-tp" id="closeTeacher">Закрыть</button>
     </div>
@@ -200,13 +203,12 @@
 // ==========================================
 // ВАШИ ДАННЫЕ ИЗ JSONBIN.IO
 // ==========================================
+// Вставьте ваш Bin ID (из скриншота: 6adf3fcdac6210605a52ef90)
 const JSONBIN_ID = "6adf3fcdac6210605a52ef90"; 
+// Вставьте ваш НОВЫЙ Master Key
 const JSONBIN_KEY = "$2a$10$bujalAa27Hh4SrgqjuDo7euQCVRbATupcO1PZQQAxIu.B80i9cRna"; 
-const TEACHER_PASSWORD = '1234';
 
-// ==========================================
-// ВАША ССЫЛКА НА САЙТ (для QR-кода)
-// ==========================================
+const TEACHER_PASSWORD = '1234';
 const SITE_URL = "https://ilnazahsanov.github.io/Ilnaz-rabota/";
 
 let ratings = [];
@@ -239,31 +241,34 @@ function enterApp(){
   nameInput.blur(); surnameInput.blur();
 }
 
-// Получение данных с JSONBin
 async function fetchRatings() {
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
       headers: { "X-Master-Key": JSONBIN_KEY }
     });
+    if (!res.ok) throw new Error("Ошибка сервера");
     const data = await res.json();
     ratings = (data.record && data.record.ratings) ? data.record.ratings : [];
+    return ratings;
   } catch(e) {
     console.error("Ошибка загрузки", e);
+    return [];
   }
 }
 
-// Отправка данных в JSONBin
 async function saveRatingsToBin(newRating) {
   try {
+    // Пытаемся сохранить первым способом
     const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
       headers: { "X-Master-Key": JSONBIN_KEY }
     });
+    
+    if (!res.ok) throw new Error("Сбой сети (телефон блокирует)");
     const data = await res.json();
     let currentArray = (data.record && data.record.ratings) ? data.record.ratings : [];
-    
     currentArray.push(newRating);
     
-    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+    const putRes = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
       method: 'PUT',
       headers: {
         "Content-Type": "application/json",
@@ -272,14 +277,36 @@ async function saveRatingsToBin(newRating) {
       body: JSON.stringify({ ratings: currentArray })
     });
 
+    if (!putRes.ok) throw new Error("Ошибка записи");
+
     ratings = currentArray;
     renderDrops();
     if (isTeacherOpen) renderTeacher();
-    
     showToast('Оценка сохранена!');
+
   } catch(e) {
-    console.error("Ошибка сохранения", e);
-    showToast('Ошибка сети при сохранении');
+    console.warn("Первая попытка не удалась, пробуем резервную...", e);
+    
+    // Резервный способ (если телефон блокирует основной)
+    try {
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+        headers: { "X-Master-Key": JSONBIN_KEY }
+      });
+      const data = await res.json();
+      let currentArray = (data.record && data.record.ratings) ? data.record.ratings : [];
+      currentArray.push(newRating);
+      
+      await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+        method: 'PUT',
+        mode: 'no-cors', // Обход блокировки
+        headers: { "Content-Type": "text/plain" }, 
+        body: JSON.stringify({ ratings: currentArray })
+      });
+      
+      showToast('Оценка отправлена (резервно)');
+    } catch(err) {
+      showToast('Ошибка! Вставьте ключи в код.', true);
+    }
   }
 }
 
@@ -349,7 +376,6 @@ let qrGenerated = false;
 document.getElementById('teacherShareBtn').addEventListener('click', () => {
   qrModal.classList.add('show');
   if(!qrGenerated){
-    // Теперь QR-код всегда ведет на ваш GitHub Pages
     document.getElementById('qrHint').textContent = 'Отсканируйте QR-код, чтобы зайти на этот сайт';
     qrContainer.innerHTML = '';
     new QRCode(qrContainer, { text: SITE_URL, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.H });
@@ -359,12 +385,14 @@ document.getElementById('teacherShareBtn').addEventListener('click', () => {
 document.getElementById('closeQr').addEventListener('click', () => qrModal.classList.remove('show'));
 
 let toastTimer;
-function showToast(msg){
+function showToast(msg, isError = false){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
+  if (isError) t.classList.add('error');
+  else t.classList.remove('error');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('show'), 1800);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 3000);
 }
 
 const teacherPanel = document.getElementById('teacherPanel');
@@ -379,6 +407,14 @@ document.getElementById('openTeacherLogin').addEventListener('click', async () =
 document.getElementById('closeTeacher').addEventListener('click', () => {
   isTeacherOpen = false;
   teacherPanel.classList.remove('show');
+});
+
+// Кнопка "Обновить" в панели учителя
+document.getElementById('refreshBtn').addEventListener('click', async () => {
+  showToast('Загрузка данных...');
+  await fetchRatings();
+  renderTeacher();
+  showToast('Данные обновлены!');
 });
 
 document.getElementById('resetBtn').addEventListener('click', async () => {
