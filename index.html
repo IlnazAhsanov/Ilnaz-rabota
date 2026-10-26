@@ -197,13 +197,16 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const STORAGE_KEY = 'derrick_ratings_v3';
+// ==========================================
+// ВСТАВЬТЕ СЮДА ВАШИ ДАННЫЕ ИЗ JSONBIN.IO
+// ==========================================
+const JSONBIN_ID = "6adf3fcdac6210605a52ef90"; 
+const JSONBIN_KEY = "$2a$10$bujalAa27Hh4SrgqjuDo7euQCVRbATupcO1PZQQAxIu.B80i9cRna"; 
 const TEACHER_PASSWORD = '1234';
 
-function loadRatings(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch(e){ return []; } }
-function saveRatings(r){ localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
-let ratings = loadRatings();
+let ratings = [];
 let currentUserFull = '', currentUserShort = '';
+let isTeacherOpen = false;
 
 const loginScreen = document.getElementById('loginScreen');
 const nameInput = document.getElementById('nameInput');
@@ -221,6 +224,7 @@ function enterApp(){
   const name = nameInput.value.trim();
   const surname = surnameInput.value.trim();
   if(name.length < 2){ nameInput.focus(); showToast('Пожалуйста, введите имя'); return; }
+  
   currentUserFull = surname ? name + ' ' + surname : name;
   currentUserShort = surname ? name + ' ' + surname.charAt(0).toUpperCase() + '.' : name;
   userNameEl.textContent = currentUserFull;
@@ -228,6 +232,50 @@ function enterApp(){
   appEl.classList.add('show');
   renderDrops();
   nameInput.blur(); surnameInput.blur();
+}
+
+// Получение данных с JSONBin
+async function fetchRatings() {
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+      headers: { "X-Master-Key": JSONBIN_KEY }
+    });
+    const data = await res.json();
+    ratings = (data.record && data.record.ratings) ? data.record.ratings : [];
+  } catch(e) {
+    console.error("Ошибка загрузки", e);
+  }
+}
+
+// Отправка данных в JSONBin
+async function saveRatingsToBin(newRating) {
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`, {
+      headers: { "X-Master-Key": JSONBIN_KEY }
+    });
+    const data = await res.json();
+    let currentArray = (data.record && data.record.ratings) ? data.record.ratings : [];
+    
+    currentArray.push(newRating);
+    
+    await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+      method: 'PUT',
+      headers: {
+        "Content-Type": "application/json",
+        "X-Master-Key": JSONBIN_KEY
+      },
+      body: JSON.stringify({ ratings: currentArray })
+    });
+
+    ratings = currentArray;
+    renderDrops();
+    if (isTeacherOpen) renderTeacher();
+    
+    showToast('Оценка сохранена!');
+  } catch(e) {
+    console.error("Ошибка сохранения", e);
+    showToast('Ошибка сети при сохранении');
+  }
 }
 
 const zoneMap = {
@@ -250,20 +298,23 @@ function renderDrops(){
   document.querySelectorAll('.drop-cell').forEach(el => el.remove());
   const byZone = { gold:[], gray:[], black:[] };
   const userVotesCount = {};
-  ratings.forEach(entry => {
+  const sortedRatings = [...ratings].sort((a,b) => a.time - b.time);
+
+  sortedRatings.forEach(entry => {
     if(byZone[entry.value]) {
       userVotesCount[entry.fullName] = (userVotesCount[entry.fullName] || 0) + 1;
       const voteNum = userVotesCount[entry.fullName];
       let displayName = entry.shortName;
-      if (ratings.filter(r => r.fullName === entry.fullName).length > 1) {
+      if (sortedRatings.filter(r => r.fullName === entry.fullName).length > 1) {
         displayName = entry.shortName + ' #' + voteNum;
       }
       byZone[entry.value].push({ name: displayName, fullName: entry.fullName, value: entry.value, time: entry.time });
     }
   });
+  
   Object.keys(zoneMap).forEach(key => {
     const zoneEl = zoneMap[key];
-    byZone[key].sort((a,b) => (a.time || 0) - (b.time || 0)).forEach((u, i) => {
+    byZone[key].forEach((u, i) => {
       const cell = document.createElement('div');
       cell.className = 'drop-cell';
       cell.style.animationDelay = (i * 0.03) + 's';
@@ -277,10 +328,13 @@ document.querySelectorAll('.pick').forEach(pick => {
   pick.addEventListener('click', () => {
     if(!currentUserFull) return;
     const value = pick.dataset.value;
-    ratings.push({ fullName: currentUserFull, shortName: currentUserShort, value: value, time: Date.now() });
-    saveRatings(ratings);
-    renderDrops();
-    showToast('Вы выбрали: ' + colors[value].label);
+    const newRating = {
+      fullName: currentUserFull,
+      shortName: currentUserShort,
+      value: value,
+      time: Date.now()
+    };
+    saveRatingsToBin(newRating);
   });
 });
 
@@ -292,7 +346,7 @@ document.getElementById('teacherShareBtn').addEventListener('click', () => {
   if(!qrGenerated){
     const url = window.location.href;
     if(url.startsWith('file://')) {
-      document.getElementById('qrHint').innerHTML = '<span style="color:#ffb3b3">Вы открыли файл локально. Чтобы QR работал, сайт должен быть открыт по ссылке https://...</span>';
+      document.getElementById('qrHint').innerHTML = '<span style="color:#ffb3b3">Вы открыли файл локально.</span>';
     } else {
       document.getElementById('qrHint').textContent = 'Отсканируйте QR-код, чтобы зайти на этот сайт';
     }
@@ -313,32 +367,63 @@ function showToast(msg){
 }
 
 const teacherPanel = document.getElementById('teacherPanel');
-document.getElementById('openTeacherLogin').addEventListener('click', () => {
+document.getElementById('openTeacherLogin').addEventListener('click', async () => {
   const pass = prompt('Введите пароль учителя:');
-  if(pass === TEACHER_PASSWORD) openTeacher();
-  else if(pass !== null) alert('Неверный пароль');
+  if(pass === TEACHER_PASSWORD) {
+    isTeacherOpen = true;
+    await fetchRatings();
+    openTeacher();
+  } else if(pass !== null) alert('Неверный пароль');
 });
-document.getElementById('closeTeacher').addEventListener('click', () => teacherPanel.classList.remove('show'));
-document.getElementById('resetBtn').addEventListener('click', () => {
-  if(confirm('Удалить все оценки?')) { ratings = []; saveRatings(ratings); renderDrops(); openTeacher(); }
+document.getElementById('closeTeacher').addEventListener('click', () => {
+  isTeacherOpen = false;
+  teacherPanel.classList.remove('show');
 });
 
-function openTeacher(){ renderTeacher(); teacherPanel.classList.add('show'); }
+document.getElementById('resetBtn').addEventListener('click', async () => {
+  if(confirm('Удалить все оценки?')) { 
+    try {
+      await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_ID}`, {
+        method: 'PUT',
+        headers: {
+          "Content-Type": "application/json",
+          "X-Master-Key": JSONBIN_KEY
+        },
+        body: JSON.stringify({ ratings: [] })
+      });
+      ratings = [];
+      renderDrops();
+      renderTeacher();
+      showToast('Все оценки удалены');
+    } catch(e) {
+      alert('Ошибка при удалении');
+    }
+  }
+});
+
+function openTeacher(){ 
+  renderTeacher(); 
+  teacherPanel.classList.add('show'); 
+}
 
 function renderTeacher(){
   const entries = [...ratings].sort((a,b)=>a.time-b.time);
   const counts = { gold:0, gray:0, black:0 };
   entries.forEach(d => counts[d.value]++);
+  
   document.getElementById('summary').innerHTML = `
     <div class="sum-card gold"><div class="num">${counts.gold}</div><div class="cap">🟡 Всё понятно</div></div>
     <div class="sum-card gray"><div class="num">${counts.gray}</div><div class="cap">⚪ Частично</div></div>
     <div class="sum-card black"><div class="num">${counts.black}</div><div class="cap">⚫ Непонятно</div></div>
     <div class="sum-card"><div class="num">${entries.length}</div><div class="cap">Всего</div></div>`;
+    
   const wrap = document.getElementById('tableWrap');
   if(!entries.length){ wrap.innerHTML = '<div class="empty">Пока никто не оценил урок.</div>'; return; }
+  
   const labels = { gold:'🟡 Всё понятно', gray:'⚪ Частично', black:'⚫ Непонятно' };
   const userCounts = {}, totalUserVotes = {};
   entries.forEach(e => totalUserVotes[e.fullName] = (totalUserVotes[e.fullName] || 0) + 1);
+  
   wrap.innerHTML = `<table><thead><tr><th>#</th><th>Имя и Фамилия</th><th>Оценка</th><th>Время</th></tr></thead><tbody>
     ${entries.map((d,i)=>{
       userCounts[d.fullName] = (userCounts[d.fullName] || 0) + 1;
@@ -352,6 +437,8 @@ function renderTeacher(){
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 window.addEventListener('resize', () => renderDrops());
+
+fetchRatings().then(() => renderDrops());
 </script>
 </body>
 </html>
