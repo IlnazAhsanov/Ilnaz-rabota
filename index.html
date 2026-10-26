@@ -198,11 +198,16 @@
 
 <script>
 // ==========================================
-// ВСТАВЬТЕ СЮДА ВАШИ ДАННЫЕ ИЗ JSONBIN.IO
+// ВАШИ ДАННЫЕ ИЗ JSONBIN.IO
 // ==========================================
 const JSONBIN_ID = "6adf3fcdac6210605a52ef90"; 
 const JSONBIN_KEY = "$2a$10$bujalAa27Hh4SrgqjuDo7euQCVRbATupcO1PZQQAxIu.B80i9cRna"; 
 const TEACHER_PASSWORD = '1234';
+
+// ==========================================
+// ВАША ССЫЛКА НА САЙТ (для QR-кода)
+// ==========================================
+const SITE_URL = "https://ilnazahsanov.github.io/Ilnaz-rabota/";
 
 let ratings = [];
 let currentUserFull = '', currentUserShort = '';
@@ -344,14 +349,10 @@ let qrGenerated = false;
 document.getElementById('teacherShareBtn').addEventListener('click', () => {
   qrModal.classList.add('show');
   if(!qrGenerated){
-    const url = window.location.href;
-    if(url.startsWith('file://')) {
-      document.getElementById('qrHint').innerHTML = '<span style="color:#ffb3b3">Вы открыли файл локально.</span>';
-    } else {
-      document.getElementById('qrHint').textContent = 'Отсканируйте QR-код, чтобы зайти на этот сайт';
-    }
+    // Теперь QR-код всегда ведет на ваш GitHub Pages
+    document.getElementById('qrHint').textContent = 'Отсканируйте QR-код, чтобы зайти на этот сайт';
     qrContainer.innerHTML = '';
-    new QRCode(qrContainer, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.H });
+    new QRCode(qrContainer, { text: SITE_URL, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.H });
     qrGenerated = true;
   }
 });
