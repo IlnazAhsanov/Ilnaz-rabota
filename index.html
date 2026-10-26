@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Оценка урока — Нефтяная вышка</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --gold:#ffcc33; --gray:#9aa4b2; --black:#1b1f27;
+    --accent:#4ea8ff; --text:#eaf1ff;
+    --drop-w: 16px; --drop-h: 21px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;font-family:'Segoe UI',system-ui,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%, #2a4a8a 0%, #121c33 60%);
+    color:var(--text); overflow:hidden;}
+  #loginScreen{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(800px 500px at 50% 40%, #25457c, #070c16); z-index:50; transition:opacity .4s;}
+  #loginScreen.hide{opacity:0; pointer-events:none;}
+  .login-card{width:min(92vw,420px); background:linear-gradient(160deg,#1d3157,#101b30);
+    border:1px solid #3f5a8a; border-radius:24px; padding:32px 26px;
+    box-shadow:0 20px 60px rgba(0,0,0,.6); text-align:center;}
+  .login-card h1{margin:0 0 6px; font-size:22px; color:#fff;}
+  .login-card p{margin:0 0 22px; color:#9fb6dd; font-size:14px;}
+  .logo-svg{width:50px; height:60px; margin:0 auto 12px; display:block; filter:drop-shadow(0 0 14px #ffcc33aa);}
+  .input-group{display:flex; flex-direction:column; gap:10px; margin-bottom:20px;}
+  .login-card input{width:100%; padding:16px 18px; font-size:18px; border-radius:14px;
+    border:1px solid #3f5a8a; background:#0c1526; color:var(--text); outline:none;}
+  .login-card input:focus{border-color:var(--accent); box-shadow:0 0 0 3px #4ea8ff44;}
+  .btn-main{width:100%; padding:16px; font-size:18px; font-weight:600; border:none; border-radius:14px;
+    background:linear-gradient(180deg,#6fc0ff,#2f7fd6); color:#fff; cursor:pointer;
+    box-shadow:0 8px 24px #2f7fd666;}
+  .teacher-link{margin-top:16px; font-size:13px; color:#7f9bc9; cursor:pointer; text-decoration:underline;}
+  #app{display:none; height:100%; flex-direction:column;}
+  #app.show{display:flex;}
+  header{padding:12px 18px; display:flex; align-items:center; justify-content:space-between;
+    background:linear-gradient(180deg,#132447,#0b1220cc); border-bottom:1px solid #2b4370; z-index:5;}
+  header .who{font-size:14px; color:#b3c7e8;}
+  header .who b{color:var(--gold); text-shadow:0 0 8px #ffcc3366;}
+  .stage-wrap{flex:1; position:relative; overflow:hidden;}
+  .stage{position:absolute; inset:0; z-index:1; display:flex; justify-content:center; align-items:flex-end;}
+  .derrick{position:relative; width:340px; height:min(82vh,740px); margin-bottom:20px;
+    display:flex; flex-direction:column; justify-content:space-between; align-items:center;}
+  .zone{width:100%; display:flex; flex-wrap:wrap; justify-content:center; align-content:flex-start;
+    gap:2px; position:relative; border-radius:16px; overflow:hidden; padding:6px;}
+  .zone-label{position:absolute; left:-80px; top:50%; transform:translateY(-50%);
+    font-size:11px; font-weight:600; color:#9fc2ff; letter-spacing:1px; text-transform:uppercase; z-index:10;}
+  @media(max-width:650px){ .zone-label{display:none;} }
+  .zone-ustye{height:200px; border:2px solid #5ab0ff; border-bottom:none;
+    background:linear-gradient(180deg,#214a8a,#173566);
+    box-shadow:inset 0 0 40px #5ab0ff44, 0 0 25px #5ab0ff33;
+    clip-path:polygon(8% 0, 92% 0, 100% 100%, 0 100%); padding-top:10px;}
+  .zone-stvol{flex:1; min-height:180px; border-left:2px solid #5ab0ff; border-right:2px solid #5ab0ff;
+    background:linear-gradient(180deg,#152c55,#0e1d3a);
+    background-image:repeating-linear-gradient(90deg, transparent 0 26px, #5ab0ff33 26px 28px),
+                     repeating-linear-gradient(0deg, transparent 0 34px, #5ab0ff33 34px 36px);}
+  .zone-zaboy{height:200px; border:2px solid #c99a00; border-top:none;
+    background:linear-gradient(180deg,#2a2410,#141008);
+    box-shadow:inset 0 0 40px #ffcc3333, 0 0 25px #ffcc3322;
+    clip-path:polygon(0 0, 100% 0, 92% 100%, 8% 100%);}
+  .base{width:360px; height:16px; margin-top:-2px;
+    background:linear-gradient(180deg,#5ab0ff,#2a3550); border-radius:6px; box-shadow:0 0 20px #5ab0ff55;}
+  .drop-cell{display:flex; flex-direction:column; align-items:center; width:40px;
+    animation:dropIn .45s cubic-bezier(.2,1.3,.4,1) both;}
+  @keyframes dropIn{0%{transform:translateY(-20px) scale(.4); opacity:0;}100%{transform:translateY(0) scale(1); opacity:1;}}
+  .drop-ico{width:var(--drop-w); height:var(--drop-h); filter:drop-shadow(0 0 4px currentColor);}
+  .drop-ico svg{width:100%; height:100%; display:block;}
+  .drop-name{font-size:9px; line-height:1.1; color:#eaf1ff; margin-top:2px; text-align:center;
+    max-width:38px; word-break:break-word; overflow:hidden;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;}
+  .picker{position:absolute; right:14px; top:50%; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:12px; z-index:10;}
+  @media(max-width:700px){ .picker{right:50%; transform:translateX(50%); top:auto; bottom:14px; flex-direction:row; gap:12px;} }
+  .pick{width:78px; height:90px; border-radius:18px; cursor:pointer;
+    background:linear-gradient(160deg,#1d3157,#101b30); border:1px solid #3f5a8a;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    padding:8px 4px; user-select:none; transition:transform .15s;}
+  .pick:active{transform:scale(.94);}
+  .pick .ico{width:26px; height:34px; filter:drop-shadow(0 0 6px currentColor);}
+  .pick .lbl{font-size:10px; color:#9fb6dd; text-align:center;}
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:100; display:none; align-items:center; justify-content:center; padding:20px;}
+  .modal.show{display:flex;}
+  .modal-content{background:#16233d; border:1px solid #3f5a8a; border-radius:24px; padding:30px; text-align:center; max-width:380px; width:100%;}
+  .modal-content h3{margin:0 0 10px; color:#fff;}
+  .modal-content p{color:#9fb6dd; font-size:14px; margin:0 0 20px;}
+  #qrcode-container{background:#fff; padding:16px; border-radius:16px; display:inline-block; margin-bottom:20px;}
+  .modal-close{width:100%; padding:14px; background:#2a3550; color:#fff; border:none; border-radius:12px; cursor:pointer;}
+  .toast{position:fixed; left:50%; bottom:30px; transform:translate(-50%,20px); background:#1d3157ee;
+    border:1px solid var(--gold); color:var(--gold); padding:12px 22px; border-radius:14px;
+    opacity:0; transition:.35s; pointer-events:none; z-index:99;}
+  .toast.show{opacity:1; transform:translate(-50%,0);}
+  #teacherPanel{position:fixed; inset:0; z-index:60; display:none; background:radial-gradient(900px 600px at 50% 0%, #1d3157, #070c16); flex-direction:column;}
+  #teacherPanel.show{display:flex;}
+  .tp-header{padding:16px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #2b4370;}
+  .tp-header h2{margin:0; color:#fff;}
+  .tp-actions{display:flex; gap:10px;}
+  .btn-tp{background:#2a3550; border:1px solid #3f5a8a; color:#cfe0ff; padding:10px 16px;
+    border-radius:12px; cursor:pointer; font-size:14px;}
+  .btn-tp.primary{background:linear-gradient(180deg,#6fc0ff,#2f7fd6); border:none; color:#fff;}
+  .tp-body{flex:1; overflow:auto; padding:20px;}
+  .summary{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px;}
+  .sum-card{flex:1; min-width:130px; background:linear-gradient(160deg,#1d3157,#101b30);
+    border:1px solid #3f5a8a; border-radius:16px; padding:14px 18px;}
+  .sum-card .num{font-size:28px; font-weight:700;}
+  .sum-card .cap{font-size:12px; color:#9fb6dd;}
+  .sum-card.gold .num{color:var(--gold);}
+  .sum-card.gray .num{color:var(--gray);}
+  .sum-card.black .num{color:#7f8b9e;}
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  th,td{padding:12px 14px; text-align:left; border-bottom:1px solid #1f2c48;}
+  th{color:#9fb6dd; font-size:12px; text-transform:uppercase;}
+  .tag{display:inline-flex; align-items:center; gap:8px; padding:5px 12px; border-radius:20px; font-size:13px; font-weight:600;}
+  .tag.gold{background:#ffcc3322; color:var(--gold); border:1px solid #ffcc3355;}
+  .tag.gray{background:#9aa4b222; color:#c7cfda; border:1px solid #9aa4b255;}
+  .tag.black{background:#1b1f2722; color:#9aa4b2; border:1px solid #3a4252;}
+  .empty{color:#6c7fa3; padding:40px; text-align:center;}
+  .danger-btn{background:#3a1f28; border:1px solid #a33; color:#ffb3b3;
+    padding:10px 16px; border-radius:12px; cursor:pointer; font-size:13px; margin-top:14px;}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <svg class="logo-svg" viewBox="0 0 50 60">
+      <polygon points="25,2 10,50 40,50" fill="none" stroke="#5ab0ff" stroke-width="2"/>
+      <line x1="15" y1="30" x2="35" y2="30" stroke="#5ab0ff" stroke-width="1.5"/>
+      <line x1="18" y1="20" x2="32" y2="20" stroke="#5ab0ff" stroke-width="1.5"/>
+      <circle cx="25" cy="55" r="3" fill="#ffcc33"/>
+    </svg>
+    <h1>Оценка урока</h1>
+    <p>Введите ваши данные, чтобы оценить,<br>как понятно объяснил учитель</p>
+    <div class="input-group">
+      <input id="nameInput" type="text" placeholder="Имя" autocapitalize="words">
+      <input id="surnameInput" type="text" placeholder="Фамилия" autocapitalize="words">
+    </div>
+    <button class="btn-main" id="startBtn">Начать</button>
+    <div class="teacher-link" id="openTeacherLogin">Вход для учителя</div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="who">Привет, <b id="userName">—</b>!</div>
+  </header>
+  <div class="stage-wrap">
+    <div class="stage">
+      <div class="derrick">
+        <div class="zone zone-ustye" data-zone="gold"><span class="zone-label">Устье</span></div>
+        <div class="zone zone-stvol" data-zone="gray"><span class="zone-label">Ствол</span></div>
+        <div class="zone zone-zaboy" data-zone="black"><span class="zone-label">Забой</span></div>
+        <div class="base"></div>
+      </div>
+    </div>
+    <div class="picker" id="picker">
+      <div class="pick" data-value="gold">
+        <svg class="ico" viewBox="0 0 34 44" style="color:#ffcc33"><path d="M17 2C17 2 3 22 3 30a14 14 0 0028 0C31 22 17 2 17 2z" fill="#ffcc33" stroke="#c99a00" stroke-width="1.5"/></svg>
+        <span class="lbl">Всё понятно</span>
+      </div>
+      <div class="pick" data-value="gray">
+        <svg class="ico" viewBox="0 0 34 44" style="color:#9aa4b2"><path d="M17 2C17 2 3 22 3 30a14 14 0 0028 0C31 22 17 2 17 2z" fill="#9aa4b2" stroke="#5c6675" stroke-width="1.5"/></svg>
+        <span class="lbl">Частично</span>
+      </div>
+      <div class="pick" data-value="black">
+        <svg class="ico" viewBox="0 0 34 44" style="color:#1b1f27"><path d="M17 2C17 2 3 22 3 30a14 14 0 0028 0C31 22 17 2 17 2z" fill="#1b1f27" stroke="#000" stroke-width="1.5"/></svg>
+        <span class="lbl">Непонятно</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="qrModal">
+  <div class="modal-content">
+    <h3>Поделиться ссылкой</h3>
+    <p id="qrHint">Отсканируйте QR-код, чтобы зайти на этот сайт</p>
+    <div id="qrcode-container"></div>
+    <button class="modal-close" id="closeQr">Закрыть</button>
+  </div>
+</div>
+
+<div id="teacherPanel">
+  <div class="tp-header">
+    <h2>👩‍🏫 Результаты урока</h2>
+    <div class="tp-actions">
+      <button class="btn-tp primary" id="teacherShareBtn">QR-код</button>
+      <button class="btn-tp" id="closeTeacher">Закрыть</button>
+    </div>
+  </div>
+  <div class="tp-body">
+    <div class="summary" id="summary"></div>
+    <div id="tableWrap"></div>
+    <button class="danger-btn" id="resetBtn">Очистить результаты</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'derrick_ratings_v3';
+const TEACHER_PASSWORD = '1234';
+
+function loadRatings(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch(e){ return []; } }
+function saveRatings(r){ localStorage.setItem(STORAGE_KEY, JSON.stringify(r)); }
+let ratings = loadRatings();
+let currentUserFull = '', currentUserShort = '';
+
+const loginScreen = document.getElementById('loginScreen');
+const nameInput = document.getElementById('nameInput');
+const surnameInput = document.getElementById('surnameInput');
+const startBtn = document.getElementById('startBtn');
+const userNameEl = document.getElementById('userName');
+const appEl = document.getElementById('app');
+
+setTimeout(()=>nameInput.focus(), 300);
+startBtn.addEventListener('click', enterApp);
+nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') surnameInput.focus(); });
+surnameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') enterApp(); });
+
+function enterApp(){
+  const name = nameInput.value.trim();
+  const surname = surnameInput.value.trim();
+  if(name.length < 2){ nameInput.focus(); showToast('Пожалуйста, введите имя'); return; }
+  currentUserFull = surname ? name + ' ' + surname : name;
+  currentUserShort = surname ? name + ' ' + surname.charAt(0).toUpperCase() + '.' : name;
+  userNameEl.textContent = currentUserFull;
+  loginScreen.classList.add('hide');
+  appEl.classList.add('show');
+  renderDrops();
+  nameInput.blur(); surnameInput.blur();
+}
+
+const zoneMap = {
+  gold:  document.querySelector('.zone-ustye'),
+  gray:  document.querySelector('.zone-stvol'),
+  black: document.querySelector('.zone-zaboy'),
+};
+const colors = {
+  gold:  { fill:'#ffcc33', stroke:'#c99a00', label:'Всё понятно' },
+  gray:  { fill:'#9aa4b2', stroke:'#5c6675', label:'Частично' },
+  black: { fill:'#1b1f27', stroke:'#000',    label:'Непонятно' },
+};
+
+function dropSVG(value){
+  const c = colors[value];
+  return `<svg viewBox="0 0 34 44"><path d="M17 2C17 2 3 22 3 30a14 14 0 0028 0C31 22 17 2 17 2z" fill="${c.fill}" stroke="${c.stroke}" stroke-width="2"/><ellipse cx="12" cy="24" rx="3" ry="5" fill="#fff" opacity="${value==='black'?0.25:0.5}"/></svg>`;
+}
+
+function renderDrops(){
+  document.querySelectorAll('.drop-cell').forEach(el => el.remove());
+  const byZone = { gold:[], gray:[], black:[] };
+  const userVotesCount = {};
+  ratings.forEach(entry => {
+    if(byZone[entry.value]) {
+      userVotesCount[entry.fullName] = (userVotesCount[entry.fullName] || 0) + 1;
+      const voteNum = userVotesCount[entry.fullName];
+      let displayName = entry.shortName;
+      if (ratings.filter(r => r.fullName === entry.fullName).length > 1) {
+        displayName = entry.shortName + ' #' + voteNum;
+      }
+      byZone[entry.value].push({ name: displayName, fullName: entry.fullName, value: entry.value, time: entry.time });
+    }
+  });
+  Object.keys(zoneMap).forEach(key => {
+    const zoneEl = zoneMap[key];
+    byZone[key].sort((a,b) => (a.time || 0) - (b.time || 0)).forEach((u, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'drop-cell';
+      cell.style.animationDelay = (i * 0.03) + 's';
+      cell.innerHTML = `<div class="drop-ico" style="color:${colors[u.value].fill}">${dropSVG(u.value)}</div><div class="drop-name" title="${escapeHtml(u.fullName)}">${escapeHtml(u.name)}</div>`;
+      zoneEl.appendChild(cell);
+    });
+  });
+}
+
+document.querySelectorAll('.pick').forEach(pick => {
+  pick.addEventListener('click', () => {
+    if(!currentUserFull) return;
+    const value = pick.dataset.value;
+    ratings.push({ fullName: currentUserFull, shortName: currentUserShort, value: value, time: Date.now() });
+    saveRatings(ratings);
+    renderDrops();
+    showToast('Вы выбрали: ' + colors[value].label);
+  });
+});
+
+const qrModal = document.getElementById('qrModal');
+const qrContainer = document.getElementById('qrcode-container');
+let qrGenerated = false;
+document.getElementById('teacherShareBtn').addEventListener('click', () => {
+  qrModal.classList.add('show');
+  if(!qrGenerated){
+    const url = window.location.href;
+    if(url.startsWith('file://')) {
+      document.getElementById('qrHint').innerHTML = '<span style="color:#ffb3b3">Вы открыли файл локально. Чтобы QR работал, сайт должен быть открыт по ссылке https://...</span>';
+    } else {
+      document.getElementById('qrHint').textContent = 'Отсканируйте QR-код, чтобы зайти на этот сайт';
+    }
+    qrContainer.innerHTML = '';
+    new QRCode(qrContainer, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.H });
+    qrGenerated = true;
+  }
+});
+document.getElementById('closeQr').addEventListener('click', () => qrModal.classList.remove('show'));
+
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+const teacherPanel = document.getElementById('teacherPanel');
+document.getElementById('openTeacherLogin').addEventListener('click', () => {
+  const pass = prompt('Введите пароль учителя:');
+  if(pass === TEACHER_PASSWORD) openTeacher();
+  else if(pass !== null) alert('Неверный пароль');
+});
+document.getElementById('closeTeacher').addEventListener('click', () => teacherPanel.classList.remove('show'));
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if(confirm('Удалить все оценки?')) { ratings = []; saveRatings(ratings); renderDrops(); openTeacher(); }
+});
+
+function openTeacher(){ renderTeacher(); teacherPanel.classList.add('show'); }
+
+function renderTeacher(){
+  const entries = [...ratings].sort((a,b)=>a.time-b.time);
+  const counts = { gold:0, gray:0, black:0 };
+  entries.forEach(d => counts[d.value]++);
+  document.getElementById('summary').innerHTML = `
+    <div class="sum-card gold"><div class="num">${counts.gold}</div><div class="cap">🟡 Всё понятно</div></div>
+    <div class="sum-card gray"><div class="num">${counts.gray}</div><div class="cap">⚪ Частично</div></div>
+    <div class="sum-card black"><div class="num">${counts.black}</div><div class="cap">⚫ Непонятно</div></div>
+    <div class="sum-card"><div class="num">${entries.length}</div><div class="cap">Всего</div></div>`;
+  const wrap = document.getElementById('tableWrap');
+  if(!entries.length){ wrap.innerHTML = '<div class="empty">Пока никто не оценил урок.</div>'; return; }
+  const labels = { gold:'🟡 Всё понятно', gray:'⚪ Частично', black:'⚫ Непонятно' };
+  const userCounts = {}, totalUserVotes = {};
+  entries.forEach(e => totalUserVotes[e.fullName] = (totalUserVotes[e.fullName] || 0) + 1);
+  wrap.innerHTML = `<table><thead><tr><th>#</th><th>Имя и Фамилия</th><th>Оценка</th><th>Время</th></tr></thead><tbody>
+    ${entries.map((d,i)=>{
+      userCounts[d.fullName] = (userCounts[d.fullName] || 0) + 1;
+      const voteLabel = totalUserVotes[d.fullName] > 1 ? ` <span style="color:#7f9bc9;font-size:12px;">(ответ ${userCounts[d.fullName]})</span>` : '';
+      const t = new Date(d.time);
+      const time = t.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+      return `<tr><td>${i+1}</td><td>${escapeHtml(d.fullName)}${voteLabel}</td><td><span class="tag ${d.value}">${labels[d.value]}</span></td><td>${time}</td></tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+window.addEventListener('resize', () => renderDrops());
+</script>
+</body>
+</html>
